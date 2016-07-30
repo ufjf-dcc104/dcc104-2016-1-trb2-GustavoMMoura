@@ -1,0 +1,37 @@
+#divCanvas {
+	width: 800px;
+    margin: 0 auto;
+    text-align: center;
+  	position: relative;
+}
+
+canvas {	
+	border: 1px solid black;
+	z-index: 1;
+  	height: 100%;
+  	width: 100%;
+}
+
+#begin {
+	font-family: Calibri;
+	font-size: 40px;
+	font-weight: bold;
+	bottom: 100px;
+  	position: inherit;
+  	z-index: 2;
+    background: #F00;
+    border: solid 0px;
+    color: white;
+    border-radius: 4px;
+    padding: 4px 20px;
+    margin-left: 4px;
+    cursor: pointer;
+}
+
+#begin:hover {
+    background-color: #000;
+}
+
+.display-none {
+    display: none;
+}
