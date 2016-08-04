@@ -22,7 +22,7 @@ function makePositionMap(nr, nc) {
 				map[c][r] = 0;
 			}
 		}
-		if (rBegin > nr - 3) {
+		if (rBegin > nr - 5) {
 			rBegin += Math.floor(Math.random() * -1);
 		} else if (rBegin == 1) {
 			rBegin += Math.floor(Math.random() * 2);
@@ -64,14 +64,15 @@ function drawLand() {
               	else {
               		h = 406;
 				}
-				consts.imgLib.draw("scenario", null, 514, h, 128, 128, t * c, consts.screenHeight -t * (1 + r), t, t);
+				library.imgLib.draw("scenario", null, 514, h, 128, 128, t * c, consts.screenHeight -t * (1 + r), t, t);
+				
 			}
 		}
 	}
 }
 
 function initialScreen() {
-	consts.imgLib.drawCentered("logo", 100);
+	library.imgLib.drawCentered("logo", 100);
 }
 
 function drawLeafs() {

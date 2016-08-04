@@ -65,15 +65,14 @@ function Animator(auto) {
 			}
 			this.current = this.animations[key];
 		}
-		if (this.current.sound) {
-			consts.soundLib.play(this.current.sound);
-		}
 	}
 	
 	//! Desenha o próximo quadro da animação atual
-	this.drawFrame = function(ctx, dt) {
+	this.drawFrame = function(dt) {
 		if(!this.current) return;
-		
+		if (this.current.sound) {
+			library.soundLib.play(this.current.sound);
+		}
 		// Vai automaticamente para o próximo frame
 		if(this.auto) this.current.updateTimer(dt);
 		
@@ -100,9 +99,17 @@ function Animator(auto) {
 		}
 
 		var frame = this.current.frame(index);
-		consts.imgLib.draw(this.current.imgKey, null,
+		library.imgLib.draw(this.current.imgKey, null,
 				frame.x, frame.y, frame.w, frame.h, 
 				-frame.w/2, -frame.h/2, frame.w, frame.h);
+	}
+
+	this.drawNFrame = function(key, n) {
+		var frame = this.animations[key].frame(n);
+		library.imgLib.draw(this.animations[key].imgKey, null,
+				frame.x, frame.y, frame.w, frame.h, 
+				-frame.w/2, -frame.h/2, frame.w, frame.h);
+		this.current = null;
 	}
 	
 	this.nextFrame = function(dt) {
@@ -132,11 +139,21 @@ function Animator(auto) {
 		
 		return copy;
 	}
-	
+	this.ended = function() {
+		return this.current.ended();
+	}
+
 	//! Liga animações criando uma sequência
-	this.linkAnimations = function(key, keyNext) { 
-		this.animations[key].next = this.animations[keyNext];
-		 }
+	this.linkAnimations = function(key, keyNext) {
+		if (keyNext)
+			this.animations[key].next = this.animations[keyNext];
+		else {
+			if (this.current)
+				this.current.next = this.animations[key];
+			else
+				this.current = this.animations[key];
+		}
+	}
 	//! Registra um evento que será chamado assim que a animação terminar
 	this.addEventTo = function(key, event, params) { this.animations[key].event = event; this.animations[key].params = params; }
 	//! Reseta o estado de uma animação

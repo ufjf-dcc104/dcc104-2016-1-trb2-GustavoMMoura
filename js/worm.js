@@ -1,3 +1,7 @@
+//modos do worm
+const ACTIVE = 0;
+const PASSIVE = 1;
+
 function Worm(config) {
 	Sprite.call(this,config);
 
@@ -12,46 +16,35 @@ function Worm(config) {
 		var falling = stm.state("falling");
 		var jumping = stm.state("jumping");
 		var armed = stm.state("armed");
+		var energy = stm.state("energy");
 
-		stopped.addTransition("toRight", movright).addTransition("toLeft", movleft).addTransition("jump", jumping).addTransition("fall", falling).addTransition("arming", armed);
-		movright.addTransition("stop", stopped).addTransition("fall", falling);
-		movleft.addTransition("stop", stopped).addTransition("fall", falling);
+		stopped.addTransition("toRight", movright).addTransition("toLeft", movleft).addTransition("jump", jumping).addTransition("fall", falling).addTransition("armingUp", armed).addTransition("armingDown", armed);
+		movright.addTransition("stop", stopped).addTransition("fall", falling).addTransition("jump", jumping);
+		movleft.addTransition("stop", stopped).addTransition("fall", falling).addTransition("jump", jumping);
 		colidingRight.addTransition("stop", stopped).addTransition("toLeft", movleft);
 		colidingLeft.addTransition("stop", stopped).addTransition("toRight", movright);
 		falling.addTransition("stop", stopped);
 		jumping.addTransition("stop", stopped);
-		armed.addTransition("stop", stopped);
-
+		armed.addTransition("disarmed", stopped).addTransition("jump", jumping).addTransition("toLeft", movleft).addTransition("toRight", movright).addTransition("armingUp", armed).addTransition("armingDown", armed).addTransition("acumulateenergy", energy).addTransition("fire", stopped);
+		
 		return stm;
 	}
 
-	var createAnimation = function() {
-		var anim = new Animator();
-		anim.createAnimation("stop1", "wstop1", null, 20, 23, 30, 20, 16, 30, 1.4, RETURN);
-		anim.createAnimation("walking", "wwalking","walking1", 15, 27, 28, 12, 16, 32, 0.5, CYCLIC);
-		anim.createAnimation("fall", "wfall", null, 2, 16, 31, 19, 17, 30, 1, CYCLIC);
-		anim.createAnimation("jumping", "wjump", "jump1", 10, 26, 35, 16, 12, 25, 0.3, NO_REPEAT);
-		anim.createAnimation("flyup", "wflyup", null, 2, 16, 31, 19, 17, 30, 1, CYCLIC);
-		anim.createAnimation("fly", "wfly", null, 7, 16, 34, 20, 15, 27, 1, NO_REPEAT);
-		anim.createAnimation("flydown", "wflydown", null, 2, 16, 31, 19, 17, 30, 1, CYCLIC);
-		anim.createAnimation("land", "wland", "landing", 6, 24, 26, 18, 17, 34, 1, CYCLIC);
-		return anim;
-	}
-
+	this.animation = library.animLib;
 	this.activeStateMachine = makeActiveStateMachine();
-	this.animation = createAnimation();
 	this.activeState;
-
+	this.angleWeapons = 0;
+	this.currentWeapon = "bazooka";
+	this.onLand = true;
 	this.life = config.life || 100;
 	this.dead = false;
+	this.outSide = false;
 	this.color = config.color || "red";
 	this.orientation = -1; //esquerda
-
-	//permissoes
-	this.canWalktoRight = true;
-	this.canWalktoLeft = true;
-
-	this.modes = []
+	this.crosspointer = new Crosspointer(this.color);
+	this.soundWeapons = true;
+	this.arms = ["bazooka", "granade"]
+	this.energy = 0;
 
 	this.maxHeight = consts.screenDivision * 1.4; //altura máxima do pulo	
 	
@@ -63,10 +56,6 @@ Worm.prototype.sumLife = function(value) {
 		this.dead = true;
 }
 
-Worm.prototype.isDead = function() {
-	return this.dead;
-}
-
 Worm.prototype.key = function() { 
 	return "worm"; 
 }
@@ -76,16 +65,30 @@ Worm.prototype.draw = function(ctx, map) {
 		ctx.translate(this.x, this.y);
 		ctx.save();
 			ctx.scale(this.sx, this.sy);
-			if(this.animation.hasAnimation()) {
-				this.animation.drawFrame(ctx, consts.DT);
+			if(!this.animation.isExecuting(this.currentWeapon + "angles") && this.animation.current != null) {
+				this.animation.drawFrame(consts.DT);
 			} else {
-				ctx.strokeStyle = "#F00";
-				ctx.strokeRect(-this.width/2, -this.height/2, this.width, this.height);
+				this.animation.drawNFrame(this.currentWeapon + "angles", this.calcFrameIndex());
 			}
 		ctx.restore();
 	ctx.restore();
-	write(this.life, "bold 14", "center", this.color, this.x, this.y - this.height + 5);
+	this.life ? write(this.life, "bold 14", "center", this.color, this.x, this.y - this.height + 5):false;
 
+
+	if (this.activeState.value() == "armed") {
+		this.crosspointer.draw(consts.ctx, this.x, this.y, this.angleWeapons, this.sx, this.calcFrameIndex());
+		drawEnergyBar(consts.ctx, this.x, this.y, this.angleWeapons, this.sx, this.energy);
+	}
+
+	// if(map) {
+	// 	var gr = map.getPosition(this.x, this.y + this.height/2 - 1, this.width, this.height, consts.screenDivision);
+		
+		// ctx.strokeStyle = "#F00";
+		// ctx.strokeRect(consts.screenDivision * (gr.x - Math.floor(gr.w/2)), consts.screenDivision * (gr.y - gr.h + 1), consts.screenDivision * gr.w, consts.screenDivision * gr.h);
+		
+		 //ctx.strokeStyle = "#00F";
+		 // ctx.strokeRect(this.left(), this.top(), this.right() - this.left(), this.bottom() - this.top());
+	//}
 }
 
 Worm.prototype.apear = function() {
@@ -102,37 +105,39 @@ Worm.prototype.apear = function() {
 }
 
 Worm.prototype.updateState = function(transition) {
-	if (this.activeState.prox(transition) && this.conditionTransition(transition)) {
+	if(this.life > 0 && this.activeState.prox(transition) && this.conditionTransition(transition)) {
 		this.activeState = this.activeState.prox(transition);
+		this.update();
 	}
-	this.update();
 }
 
 Worm.prototype.update = function() {
 	if (this.activeState.value() == "stopped") {
 		this.vx = this.ax = 0;
 		this.vy = this.ay = 0;		
-		this.animation.executeAnimation("stop1");
-	} 
+		this.animation.linkAnimations("stop1");
+	}
 	else if (this.activeState.value() == "movingright") {
 		this.vx = 40;
 		this.sx = -1;
 		this.animation.executeAnimation("walking");
-		consts.soundLib.play("moving");
+		library.soundLib.play("walking1");
 	} 
 	else if (this.activeState.value() == "movingleft") {
 		this.vx = -40;
 		this.sx = 1;
 		this.animation.executeAnimation("walking");
-		consts.soundLib.play("moving");
+		library.soundLib.play("walking1");
 	} 
-	else if (this.activeState.value() == "fall") {
+	else if (this.activeState.value() == "falling") {
+		this.vx = this.ax = 0;
 		this.ay = consts.G;
 		this.animation.executeAnimation("fall");
 		this.animation.linkAnimations("fall", "stop1");
 	} 
-	else if (this.activeState.value() == "jump") {
-		executeJump();
+	else if (this.activeState.value() == "jumping") {
+		this.jump = true;
+		this.executeJump();
 	} 
 	else if (this.activeState.value() == "colidingLeft") {
 		this.vx = this.ax = 0;
@@ -144,72 +149,241 @@ Worm.prototype.update = function() {
 	}
 	else if (this.activeState.value() == "armed") {
 		this.vx = this.ax = 0;
-		executeArmed();
+		this.angleWeapons = 0;
+		if (this.soundWeapons) library.soundLib.play("weapons");
+		this.animation.executeAnimation(this.currentWeapon + "get");
+		this.animation.linkAnimations(this.currentWeapon + "get", this.currentWeapon + "angles");
+		this.soundWeapons = false;
+	}
+	else if (this.activeState.value() == "energy") {
+
 	}
 }
 
-Worm.prototype.canWalk = function(map, x, y, div) {
-	this.sideCollision(map, x, y, div);
-	var left = this.sideLeftCollision(map, x, y, div);
-	var right = this.sideRightCollision(map, x, y, div);
-	return !(left && right);
-}
-
-Worm.prototype.isOnLand = function(map, div) {
-	var posXUnder = Math.floor(this.x/div);
-	var posYUnder = Math.floor((400 - this.y + 10)/div) - 1;
-	var topUnder = div * (posYUnder) - 10 + div;
-	consts.ctx.strokeStyle = "#FFF";
-	consts.ctx.strokeRect( div * posXUnder, 404-div * (posYUnder+ 1),div, div);
-	if (topUnder == (380 - Math.floor(this.y)) && map[posXUnder][posYUnder] == 1) {
-		this.y = Math.floor(this.y);
-		if (this.fall) {
-			consts.soundLib.play("landing");
+Worm.prototype.conditionTransition = function(transition) {
+	if (transition == "toRight") {
+		if (this.activeState.value() == "armed") {
+			this.animation.executeAnimation(this.currentWeapon + "back");
+			this.animation.lock = false;
 		}
-		this.fall = false;
 		return true;
 	}
-	this.updateState(4);
-	return false;
+	else if (transition == "toLeft") {
+		if (this.activeState.value() == "armed") {
+			this.animation.executeAnimation(this.currentWeapon + "back");
+			this.animation.lock = false;
+		}
+		return true
+	}
+	else if (transition == "stop") {
+		if ((this.activeState.value() != "falling" && this.activeState.value() != "jumping") || this.onLand) {
+			if (this.activeState.value() == "falling" || this.activeState.value() == "jumping") {
+				library.soundLib.play("landing");
+			}
+			if (this.activeState.value() == "jumping") {
+				this.animation.executeAnimation("land");
+			}
+			return true;
+		} else 
+			return false;
+	} 
+	else if (transition == "armingUp" && this.activeState.value() == "armed") {
+		if(this.angleWeapons > -90) {
+			this.angleWeapons -= 2;	
+		}
+		return false;
+	}
+	else if (transition == "armingDown" && this.activeState.value() == "armed") {
+		if (this.angleWeapons < 90) {
+			this.angleWeapons += 2;
+		}
+		return false;
+	}
+	else if (transition == "acumulateenergy" && this.activeState.value() == "armed") {
+		if (this.energy == 0)
+			library.soundLib.play("throwpowerup");
+		this.energy += 3;
+		if (this.energy > 85) {
+			this.updateState("fire");
+			this.energy = 0;
+		}
+		return false;
+	}
+	else if (transition == "fire") {
+		this.fire(this.energy);
+		this.animation.executeAnimation(this.currentWeapon + "back");
+		this.activeState.prox("stop");
+		if (this.currentWeapon == "granade") {
+			library.soundLib.play("watchthis");
+			weapons.push(new Granade({x: this.x, 
+									  y:this.y, 
+									  vx: Math.cos(this.angleWeapons * this.sx * Math.PI/180) * this.energy, 
+									  vy: Math.sin(this.angleWeapons * this.sx * Math.PI/180) * this.energy, 
+									  time: 3, 
+									  ay: consts.G
+									})
+			);
+		}
+		else {
+			library.soundLib.play("fire");
+			weapons.push(new Bazooka({x: this.x, 
+									  y:this.y, 
+									  vx: Math.cos(this.angleWeapons * this.sx * Math.PI/180) * this.energy, 
+									  vy: Math.sin(this.angleWeapons * this.sx * Math.PI/180) * this.energy, 
+									  ay: consts.G, 
+									  ax: consts.windSpeed
+									})
+			);
+		}
+
+	}
+	return true;
+}
+
+Worm.prototype.isOnLand = function() {
+	if (!this.outSide) {
+		var div = consts.screenDivision;
+		var posXUnder = Math.floor(this.x/div);
+		var posYUnder = Math.floor((400 - this.y + 10)/div) - 1;
+		var topUnder = div * (posYUnder + 1) - 10;
+		// consts.ctx.strokeStyle = "#FFF";
+		// consts.ctx.strokeRect( div * posXUnder, 404-div * (posYUnder+ 1),div, div);
+		if (consts.posMap[posXUnder][posYUnder] == 1 && ((topUnder == (380 - Math.floor(this.y)) || (this.vy >=0 && topUnder > (380 - Math.floor(this.y)))))) {
+				this.y = Math.floor(this.y);
+				this.onLand = true;
+		}
+		else 
+			this.onLand = false;
+	}
+	else 
+		this.onLand = false;
 }
 
 Worm.prototype.sideLeftCollision = function(map, x, y, div) {
+	x -= this.vx * consts.DT;
 	var posX = Math.floor((x - this.width/2)/div);
-	var posY = Math.floor((404 -y)/div);
-	if (map[posX][posY] == 1) {
-		this.canWalktoLeft = false;
+	var posY = Math.floor((404 - y)/div);
+	if (posX >= 0 && map[posX][posY] == 1) {
 		return true;
 	}
-	this.canWalktoLeft = true;
 	return false;
 }
 
 Worm.prototype.sideRightCollision = function(map, x, y, div) {
+	x += this.vx * consts.DT;
 	var posX = Math.floor((x + this.width/2)/div);
-	var posY = Math.floor((404 -y)/div);
-	if (map[posX][posY] == 1) {
-		this.canWalktoRight = false;
+	var posY = Math.floor((404 - y)/div);
+	if (posX < map.length && map[posX][posY] == 1) {
 		return true;
 	}
-	this.canWalktoRight = true;
 	return false;
 }
 
 Worm.prototype.sideCollision = function(map, x, y, div) {
-	var posX0 = Math.floor((x - this.width/2)/div);
-	var posX1 = Math.floor((x + this.width/2)/div);
-	var posY = Math.floor((404 -y)/div);
-	consts.ctx.strokeStyle = "#000";
-	consts.ctx.strokeRect(Math.floor(this.x/div)*div, Math.floor(this.y/div)*div, div, div);
-	consts.ctx.strokeStyle = "#0F0";
-	consts.ctx.strokeRect( div * posX0, 404-div * (1 + posY),div, div);
-	if (map[posX0][posY] == 1 || map[posX1][posY] == 1 ) {
-		return false;
-	}
-	return true;
+	return (this.sideLeftCollision(map, x, y, div) || this.sideRightCollision(map, x, y, div));
 }
 
-Worm.prototype.conditionTransition = function(transition) {
-	var conditionTransition = new Map();
-	return true;
+Worm.prototype.canMove = function() {
+	var result;
+	this.isOnLand();
+	if (this.activeState.value() == "movingright") {
+		result = (!this.sideRightCollision(consts.posMap, this.x, this.y, consts.screenDivision) && this.onLand);
+	} 
+	else if (this.activeState.value() == "movingleft") {
+		result = !(this.sideLeftCollision(consts.posMap, this.x, this.y, consts.screenDivision) && this.onLand);
+	} 
+	else if (this.activeState.value() == "falling") {
+		result = !this.onLand;
+		if (this.onLand) {
+			this.updateState("stop");
+		}
+	}
+	else if (this.activeState.value() == "stopped") { 
+		result = (this.activeState.value() != "falling" && this.activeState.value() != "jumping");
+	}
+	else if (this.activeState.value() == "jumping") {
+		this.executeJump();
+		if (this.onLand && this.down) {
+			this.down = false;
+			this.updateState("stop");
+			result = true;
+		}
+		else {
+			if (this.sideLeftCollision(consts.posMap, this.x, this.y, consts.screenDivision)) {
+				this.vx *= this.vx < 0 ? -1 : 1;
+				this.sx *= this.sx > 0 ? -1 : 1;
+			}
+			if (this.sideRightCollision(consts.posMap, this.x, this.y, consts.screenDivision)){
+				this.vx *= this.vx > 0 ? -1 : 1;
+				this.sx *= this.sx < 0 ? -1 : 1;
+			}
+			result = true;
+		}
+	} else {
+		result = true;
+	}
+	if (!this.onLand && this.activeState.value() != "jumping") {
+		this.updateState("fall");
+	}
+	if(this.isOutSide()) {
+		this.updateState("outland");
+	}
+	return result;
+}
+
+
+
+Worm.prototype.isOutSide = function() {
+	if (this.x < 0 || this.x > consts.screenWidth) {
+		this.outSide = true;
+		return true;
+	}
+	return false;
+}
+
+Worm.prototype.executeJump = function() {
+	if (this.jump) {
+		this.animation.executeAnimation("jump");
+		this.animation.linkAnimations("jump", "flyup");
+		this.flying = true;
+		this.jump = false;
+	}
+	else if (this.flying) {
+		this.vx = this.sx * -40;
+		this.vy = -Math.sqrt(2 * Math.abs(consts.G) * this.maxHeight);
+		this.ay = consts.G;
+		this.flying = false;
+	} 
+	else if (this.vy < -20) {
+		this.animation.executeAnimation("fly");
+		this.animation.linkAnimations("fly", "flydown");
+	}
+	else if (this.vy > 0)
+		this.down = true;
+}
+
+Worm.prototype.calcFrameIndex = function() {
+	return Math.round(31/-180*(this.angleWeapons - 90));
+}
+
+Worm.prototype.selectArm = function(arm) {
+	if (this.currentWeapon != this.arms[arm]) {
+		this.currentWeapon = this.arms[arm];
+		if (this.activeState.value() == "armed") {
+			this.animation.executeAnimation(this.arms[1 - arm] + "back");
+			this.animation.linkAnimations(this.arms[1 - arm] + "back", this.arms[arm] + "get");
+			this.animation.linkAnimations(this.arms[arm] + "get", this.arms[arm] + "angles");
+		}
+	}
+}
+
+Worm.prototype.die = function() {
+	this.animation.executeAnimation("die");
+	this.animation.linkAnimations("die", "explosion25");
+	this.animation.linkAnimations("explosion25", "grave");
+	library.soundLib.play("byebye");
+}
+
+Worm.prototype.fire = function() {
+
 }

@@ -1,7 +1,7 @@
 function Team(name, color, numbersWorms) {
 	this.color;
 	this.numbersWorms = numbersWorms || 1;
-
+	this.lifeTeam = 0;
 	this.current = 0;
 
 	this.listWorms = new Array(numbersWorms);
@@ -12,15 +12,22 @@ function Team(name, color, numbersWorms) {
 	}
 
 	this.draw = function() {
+		this.lifeTeam = 0;
 		for (i = 0; i < numbersWorms; i++) {
-			this.listWorms[i].draw(consts.ctx, consts.posMap);
+			if (!this.listWorms[i].outSide) {
+				this.listWorms[i].draw(consts.ctx, consts.posMap);
+				this.lifeTeam += this.listWorms[i].life;
+			}
 		}
 	}
 
 	this.changeWorm = function() {
 		this.current++;
-		if (this.current >= this.numbersWorms)
-			this.current = 0;
+		while (!this.listWorms[this.current].dead) {
+			this.current++;
+			if (this.current >= this.numbersWorms)
+				this.current = 0;
+		}
 	}
 
 	this.updateState = function(state) {
@@ -29,6 +36,10 @@ function Team(name, color, numbersWorms) {
 
 	this.move = function(dt) {
 		this.listWorms[this.current].move(dt);
+	}
+
+	this.selectArm = function(arm) {
+		this.listWorms[this.current].selectArm(arm);
 	}
 }
 
@@ -62,5 +73,9 @@ function Teams(namesTeams, numberTeams, numbersWorms) {
 
 	this.move = function(dt) {
 		this.teams[this.current].move(dt);
+	}
+
+	this.selectArm = function(arm) {
+		this.teams[this.current].selectArm(arm);	
 	}
 }

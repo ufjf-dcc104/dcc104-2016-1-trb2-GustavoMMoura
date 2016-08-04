@@ -5,16 +5,18 @@ Sprite = function(config) {
 	this.ax = config.ax || 0;
 	this.vy = config.vy || 0;
 	this.ay = config.ay || 0;
-	this.width = config.width || 8;
-	this.height = config.height || 8;
+	this.width = config.width || 30;
+	this.height = config.height || 30;
 	this.sx = config.sx || 1;
 	this.sy = config.sy || 1;
 
 	this.move = function(dt) {
-		this.x = this.x + this.vx * dt;
-		this.vx = this.vx + this.ax * dt;
-		this.y = this.y + this.vy * dt;
-		this.vy = this.vy + this.ay * dt;
+		if (this.canMove()) {
+			this.x = this.x + this.vx * dt;
+			this.vx = this.vx + this.ax * dt;
+			this.y = this.y + this.vy * dt;
+			this.vy = this.vy + this.ay * dt;
+		}
 	}
 
 	this.colision = function(sprite) {
@@ -30,9 +32,8 @@ Sprite = function(config) {
 	this.top  = function() { return this.y - this.height/2; }
 }
 
-Sprite.prototype.canWalk = function(map, x, y, div) { throw new NullImplementationException("Sprite.canWalk(map, x, y, div)");  }
 Sprite.prototype.update = function(dt, g) { throw new NullImplementationException("Sprite.update(dt, g)");  }
-Sprite.prototype.isOnLand = function(map, x, y, div) { throw new NullImplementationException("Sprite.isOnLand(map, x, y, div)");  }
+Sprite.prototype.canMove = function(param) {return true;}
 
 var inherit = function (child, father) {
 	child.prototype = Object.create(father.prototype);
