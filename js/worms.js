@@ -10,11 +10,10 @@ var consts = {
     FPS: 40,
     DT: 1/40,
     windSpeed: 0,
-    EPS: 0.05
+    EPS: 0.05,	//< floating error
 }
 
 var library = {};
-var weapons = [];
 
 var write = function(text, size, align, color, x, y) {
 	consts.ctx.fillStyle = color;
@@ -105,7 +104,7 @@ function loadResources(callback) {
 		soundLib.load("byebye", "500", "sounds/worm/byebye.wav");
 		soundLib.load("firstblood", "sounds/worm/firstblood.wav");
 		soundLib.load("missed", "sounds/worm/missed.wav");
-		soundLib.load("fire", "500", "sounds/worm/fire.wav");
+		soundLib.load("fire", "sounds/worm/fire.wav");
 		soundLib.load("hello", "sounds/worm/hello.wav");
 		soundLib.load("hurry", "sounds/worm/hurry.wav");
 		soundLib.load("jump1", "500", "sounds/worm/jump1.wav");
@@ -116,17 +115,15 @@ function loadResources(callback) {
 		soundLib.load("oinutter", "sounds/worm/oinutter.wav");
 		soundLib.load("stupid", "sounds/worm/stupid.wav");
 		soundLib.load("traitor", "sounds/worm/traitor.wav");
+		soundLib.load("watchthis", "sounds/worm/watchthis.wav");
 		soundLib.load("victory", "sounds/worm/victory.wav");
-		soundLib.load("watchthis", "500", "sounds/worm/watchthis.wav");
+		soundLib.load("watchthis", "sounds/worm/watchthis.wav");
 		soundLib.load("yessir", "sounds/worm/yessir.wav");
 		soundLib.load("youllregretthat", "sounds/worm/youllregretthat.wav");
 		soundLib.load("walking1", "500", "sounds/worm/Walk-Compress.wav");
 		soundLib.load("walking2", "sounds/worm/Walk-Expand.wav");
-		soundLib.load("weapons", "500", "sounds/worm/collect.wav");
-		soundLib.load("grenadeimpact", "500", "sounds/grenadeimpact.wav");
-		soundLib.load("rocketpowerup", "500", "sounds/rocketpowerup.wav");
-		soundLib.load("rocketrelease", "500", "sounds/rocketrelease.wav");
-		soundLib.load("throwpowerup", "100", "sounds/throwpowerup.wav");
+		soundLib.load("weapons", "500" , "sounds/worm/collect.wav");
+		soundLib.load("explosion", "500" , "sounds/explosion1.wav");
 		(function pull(){
       		if(!soundLib.isReady()){
 		        setTimeout(pull, 0);
@@ -146,7 +143,7 @@ function loadResources(callback) {
 		anim.createAnimation("flyup", "wflyup", null, 2, 20, 26, 19, 26, 25, 1, CYCLIC);
 		anim.createAnimation("fly", "wfly", null, 7, 16, 36, 20, 15, 24, 1, NO_REPEAT);
 		anim.createAnimation("flydown", "wflydown", null, 2, 16, 31, 19, 17, 30, 1, CYCLIC);
-		anim.createAnimation("land", "wland", "landing", 6, 24, 26, 18, 17, 34, 0.5, NO_REPEAT);
+		anim.createAnimation("land", "wland", "landing", 6, 24, 26, 18, 17, 34, 1, NO_REPEAT);
 		anim.createAnimation("bazookaget", "bazookaget", null, 7, 36, 27, 13, 16, 33, 0.4, NO_REPEAT);
 		anim.createAnimation("bazookaangles", "bazookaangles", null, 32, 60, 30, 0, 15, 30, 1, NO_REPEAT);
 		anim.createAnimation("bazookaback", "bazookaback", null, 7, 36, 27, 13, 16, 33, 0.4, NO_REPEAT);
@@ -214,13 +211,11 @@ function loop(){
 		drawLand();
 		consts.teams.move(consts.DT);
 		consts.teams.draw();
-		weapons.forEach(function (el) {
-			el.draw(consts.ctx);
-		});
 	}
 }
 
 addEventListener("keydown", function(e){
+	console.log(e.code + ": " + e.keyCode);
 	switch (e.keyCode) {
 		case 65: //A
 		case 37: consts.teams.updateState("toLeft"); break; //ArrowLeft
@@ -249,6 +244,6 @@ addEventListener("keyup", function(e){
 		case 38: //ArrowUp
 		case 83: //S
 		case 40: break;//ArrowDown
-		case 32: consts.teams.updateState("fire");//Space
+		case 32: consts.teams.updateState("fired");//Space
 	}
 });
